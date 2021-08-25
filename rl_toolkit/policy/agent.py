@@ -209,6 +209,9 @@ class Agent(Policy):
         self._total_steps = 0
         self._last_obs = self._env.reset()
         self._last_action = self.collect_policy(self._last_obs)
+        self._last_action = np.array(
+            self._last_action, copy=False, dtype="float32"
+        )
 
         # spojenie s db
         with self.client.trajectory_writer(num_keep_alive_refs=2) as writer:
