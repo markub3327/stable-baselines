@@ -3,7 +3,7 @@ import tensorflow as tf
 
 
 def make_reverb_dataset(
-    server_address: str, table: str, batch_size: int, num_parallel_calls: int = 6
+    server_address: str, table: str, batch_size: int, num_parallel_calls: int = 12
 ):
     def _make_dataset(unused_idx):
         dataset = reverb.TrajectoryDataset.from_table_signature(
