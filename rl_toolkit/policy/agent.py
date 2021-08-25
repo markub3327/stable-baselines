@@ -103,12 +103,12 @@ class Agent(Policy):
     def collect(self, writer, max_steps, policy):
         # collect the rollout
         for _ in range(max_steps):
-            # Get the action
-            action = policy(self._last_obs)
-            action = np.array(action, copy=False, dtype="float32")
-
             # perform action
-            new_obs, reward, terminal, _ = self._env.step(action)
+            new_obs, reward, terminal, _ = self._env.step(self._last_action)
+
+            # Get the next action
+            new_action = policy(new_obs)
+            new_action = np.array(new_action, copy=False, dtype="float32")
 
             # Update variables
             self._episode_reward += reward
@@ -119,7 +119,7 @@ class Agent(Policy):
             writer.append(
                 {
                     "observation": self._last_obs.astype("float32", copy=False),
-                    "action": action,
+                    "action": self._last_action,
                     "reward": np.array([reward], copy=False, dtype="float32"),
                     "terminal": np.array([terminal], copy=False, dtype="bool"),
                 }
@@ -135,6 +135,7 @@ class Agent(Policy):
                         "action": writer.history["action"][-2],
                         "reward": writer.history["reward"][-2],
                         "next_observation": writer.history["observation"][-1],
+                        "next_action": writer.history["action"][-1],
                         "terminal": writer.history["terminal"][-2],
                     },
                 )
@@ -142,7 +143,12 @@ class Agent(Policy):
             # Check the end of episode
             if terminal:
                 # Write the final interaction !!!
-                writer.append({"observation": new_obs.astype("float32", copy=False)})
+                writer.append(
+                    {
+                        "observation": new_obs.astype("float32", copy=False),
+                        "action": new_action,
+                    }
+                )
                 writer.create_item(
                     table="experience",
                     priority=1.0,
@@ -151,6 +157,7 @@ class Agent(Policy):
                         "action": writer.history["action"][-2],
                         "reward": writer.history["reward"][-2],
                         "next_observation": writer.history["observation"][-1],
+                        "next_action": writer.history["action"][-1],
                         "terminal": writer.history["terminal"][-2],
                     },
                 )
@@ -182,9 +189,17 @@ class Agent(Policy):
 
                 # Init environment
                 self._last_obs = self._env.reset()
+
+                # Get the action
+                self._last_action = policy(self._last_obs)
+                self._last_action = np.array(
+                    self._last_action, copy=False, dtype="float32"
+                )
+
             else:
                 # Super critical !!!
                 self._last_obs = new_obs
+                self._last_action = new_action
 
     def run(self):
         # init environment
@@ -193,6 +208,7 @@ class Agent(Policy):
         self._total_episodes = 0
         self._total_steps = 0
         self._last_obs = self._env.reset()
+        self._last_action = self.random_policy(self._last_obs)
 
         # spojenie s db
         with self.client.trajectory_writer(num_keep_alive_refs=2) as writer:

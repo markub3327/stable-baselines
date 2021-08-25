@@ -57,7 +57,7 @@ class Actor(Model):
     def reset_noise(self):
         self.noise.sample_weights()
 
-    def call(self, inputs, with_log_prob=True, deterministic=None):
+    def call(self, inputs, with_log_prob=True, deterministic=None, action=None):
         # 1. layer
         x = self.fc1(inputs)
 
@@ -68,11 +68,24 @@ class Actor(Model):
         mean = self.mean(latent_sde)
 
         if deterministic:
-            action = self.bijector.forward(mean)
-            log_prob = None
+            a = self.bijector.forward(mean)
+            return [a, None]
+        elif action != None:
+            variance = tf.matmul(
+                tf.square(latent_sde), tf.square(self.noise.get_std())
+            )
+            pi_distribution = tfp.distributions.TransformedDistribution(
+                distribution=tfp.distributions.MultivariateNormalDiag(
+                    loc=mean, scale_diag=tf.sqrt(variance + 1e-6)
+                ),
+                bijector=self.bijector,
+            )
+            log_prob = pi_distribution.log_prob(action)[..., tf.newaxis]
+
+            return [None, log_prob]
         else:
             noise = self.noise(latent_sde)
-            action = self.bijector.forward(mean + noise)
+            a = self.bijector.forward(mean + noise)
 
             if with_log_prob:
                 variance = tf.matmul(
@@ -84,8 +97,8 @@ class Actor(Model):
                     ),
                     bijector=self.bijector,
                 )
-                log_prob = pi_distribution.log_prob(action)[..., tf.newaxis]
+                log_prob = pi_distribution.log_prob(a)[..., tf.newaxis]
             else:
                 log_prob = None
 
-        return [action, log_prob]
+            return [a, log_prob]

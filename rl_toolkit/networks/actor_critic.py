@@ -15,7 +15,6 @@ class ActorCritic(Model):
         n_critics (int): number of critic networks
         n_outputs (int): number of outputs
         gamma (float): the discount factor
-        tau (float): the soft update coefficient for target networks
         init_alpha (float): initialization of log_alpha param
 
     References:
@@ -30,14 +29,12 @@ class ActorCritic(Model):
         n_critics: int,
         n_outputs: int,
         gamma: float,
-        tau: float,
         init_alpha: float,
         **kwargs,
     ):
         super(ActorCritic, self).__init__(**kwargs)
 
         self.gamma = tf.constant(gamma)
-        self.tau = tf.constant(tau)
         self.cum_prob = tf.constant(
             (tf.range(n_quantiles, dtype=tf.float32) + 0.5) / n_quantiles
         )[tf.newaxis, tf.newaxis, :, tf.newaxis]
@@ -58,20 +55,6 @@ class ActorCritic(Model):
             n_critics=n_critics,
         )
 
-        # Critic target
-        self.critic_target = MultiCritic(
-            n_quantiles=n_quantiles,
-            top_quantiles_to_drop=top_quantiles_to_drop,
-            n_critics=n_critics,
-        )
-        self._update_target(self.critic, self.critic_target, tau=tf.constant(1.0))
-
-    def _update_target(self, net, net_targ, tau):
-        for source_weight, target_weight in zip(
-            net.trainable_variables, net_targ.trainable_variables
-        ):
-            target_weight.assign(tau * source_weight + (1.0 - tau) * target_weight)
-
     def train_step(self, data):
         # Re-new noise matrix every update of 'log_std' params
         self.actor.reset_noise()
@@ -80,19 +63,14 @@ class ActorCritic(Model):
         alpha = tf.exp(self.log_alpha)
 
         # -------------------- Update 'Critic' -------------------- #
-        next_action, next_log_pi = self.actor(
-            data["next_observation"],
-            with_log_prob=True,
-            deterministic=False,
-        )
-        next_quantiles = self.critic_target([data["next_observation"], next_action])
+        _, next_log_pi = self.actor(inputs=data["next_observation"], action=data["next_action"])
+        next_quantiles = self.critic([data["next_observation"], data["next_action"]])
         next_quantiles = tf.sort(
             tf.reshape(next_quantiles, [next_quantiles.shape[0], -1])
         )
         next_quantiles = next_quantiles[
             :,
-            : self.critic_target.quantiles_total
-            - self.critic_target.top_quantiles_to_drop,
+            : self.critic.quantiles_total - self.critic.top_quantiles_to_drop,
         ]
 
         # Bellman Equation
@@ -159,9 +137,6 @@ class ActorCritic(Model):
 
         # Delete the persistent tape manually
         del tape
-
-        # -------------------- Soft update target networks -------------------- #
-        self._update_target(self.critic, self.critic_target, tau=tf.constant(self.tau))
 
         return {
             "actor_loss": actor_loss,

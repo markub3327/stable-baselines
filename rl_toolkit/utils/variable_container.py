@@ -25,9 +25,7 @@ class VariableContainer:
         self.dtypes = tf.nest.map_structure(lambda spec: spec.dtype, self.signature)
 
     def update_variables(self):
-        sample = self.tf_client.sample(
-            self._table, data_dtypes=[self.dtypes]
-        ).data[0]
+        sample = self.tf_client.sample(self._table, data_dtypes=[self.dtypes]).data[0]
         for variable, value in zip(
             tf.nest.flatten(self._variables), tf.nest.flatten(sample)
         ):

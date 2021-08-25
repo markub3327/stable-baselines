@@ -1,6 +1,7 @@
-from .policy import Policy
 import reverb
 import tensorflow as tf
+
+from .policy import Policy
 
 
 class Server(Policy):
@@ -28,7 +29,7 @@ class Server(Policy):
         db_path: str,
     ):
         super(Server, self).__init__(env_name)
-    
+
         # Load DB from checkpoint or make a new one
         if db_path is None:
             checkpointer = None
@@ -70,6 +71,10 @@ class Server(Policy):
                         "next_observation": tf.TensorSpec(
                             [*self._env.observation_space.shape],
                             self._env.observation_space.dtype,
+                        ),
+                        "next_action": tf.TensorSpec(
+                            [*self._env.action_space.shape],
+                            self._env.action_space.dtype,
                         ),
                         "terminal": tf.TensorSpec([1], tf.bool),
                     },

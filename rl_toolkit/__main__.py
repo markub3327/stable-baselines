@@ -1,6 +1,6 @@
 import argparse
 
-from rl_toolkit.policy import Agent, Learner, Tester, Server
+from rl_toolkit.policy import Agent, Learner, Server, Tester
 
 if __name__ == "__main__":
     my_parser = argparse.ArgumentParser(
@@ -24,10 +24,30 @@ if __name__ == "__main__":
     )
 
     # create the parser for the "server" sub-command
-    parser_agent = sub_parsers.add_parser(
+    parser_server = sub_parsers.add_parser(
         "server",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         help="Server mode",
+    )
+    parser_server.add_argument(
+        "--min_replay_size",
+        type=int,
+        help="Minimum number of samples in memory before learning starts",
+        default=int(1e4),
+    )
+    parser_server.add_argument(
+        "--samples_per_insert",
+        type=int,
+        help="Samples per insert ratio (SPI)",
+    )
+    parser_server.add_argument(
+        "--buffer_capacity",
+        type=int,
+        help="Maximal capacity of memory",
+        default=int(1e6),
+    )
+    parser_server.add_argument(
+        "--db_path", type=str, help="DB's checkpoints path", default="./save/db"
     )
 
     # create the parser for the "agent" sub-command
@@ -78,9 +98,6 @@ if __name__ == "__main__":
         default=0.99,
     )
     parser_learner.add_argument(
-        "--tau", type=float, help="Soft update rate", default=0.01
-    )
-    parser_learner.add_argument(
         "--init_alpha",
         type=float,
         help="Initialization value of alpha (entropy coeff)",
@@ -105,23 +122,6 @@ if __name__ == "__main__":
         default=7.3e-4,
     )
     parser_learner.add_argument(
-        "--buffer_capacity",
-        type=int,
-        help="Maximal capacity of memory",
-        default=int(1e6),
-    )
-    parser_learner.add_argument(
-        "--min_replay_size",
-        type=int,
-        help="Minimum number of samples in memory before learning starts",
-        default=int(1e4),
-    )
-    parser_learner.add_argument(
-        "--samples_per_insert",
-        type=int,
-        help="Samples per insert ratio (SPI)",
-    )
-    parser_learner.add_argument(
         "--batch_size", type=int, help="Size of the mini-batch", default=256
     )
     parser_learner.add_argument(
@@ -133,9 +133,6 @@ if __name__ == "__main__":
     )
     parser_learner.add_argument(
         "-f", "--model_path", type=str, help="Path to saved model"
-    )
-    parser_learner.add_argument(
-        "--db_path", type=str, help="DB's checkpoints path", default="./save/db"
     )
 
     # create the parser for the "tester" sub-command
@@ -206,7 +203,6 @@ if __name__ == "__main__":
             critic_learning_rate=args.critic_learning_rate,
             alpha_learning_rate=args.alpha_learning_rate,
             gamma=args.gamma,
-            tau=args.tau,
             init_alpha=args.init_alpha,
             save_path=args.save_path,
             model_path=args.model_path,
