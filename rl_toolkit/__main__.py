@@ -1,6 +1,6 @@
 import argparse
 
-from rl_toolkit.policy import Agent, Learner, Tester
+from rl_toolkit.policy import Agent, Learner, Tester, Server
 
 if __name__ == "__main__":
     my_parser = argparse.ArgumentParser(
@@ -21,6 +21,13 @@ if __name__ == "__main__":
         description="Select the operating mode",
         dest="mode",
         required=True,
+    )
+
+    # create the parser for the "server" sub-command
+    parser_agent = sub_parsers.add_parser(
+        "server",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        help="Server mode",
     )
 
     # create the parser for the "agent" sub-command
@@ -53,6 +60,9 @@ if __name__ == "__main__":
         "learner",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         help="Learner mode",
+    )
+    parser_learner.add_argument(
+        "--db_server", type=str, help="DB server name", default="localhost"
     )
     parser_learner.add_argument(
         "-t",
@@ -151,8 +161,25 @@ if __name__ == "__main__":
     # nacitaj zadane argumenty
     args = my_parser.parse_args()
 
+    # Server mode
+    if args.mode == "server":
+        agent = Server(
+            env_name=args.environment,
+            min_replay_size=args.min_replay_size,
+            samples_per_insert=args.samples_per_insert,
+            buffer_capacity=args.buffer_capacity,
+            db_path=args.db_path,
+        )
+
+        try:
+            agent.run()
+        except KeyboardInterrupt:
+            print("Terminated by user 👋👋👋")
+        finally:
+            agent.close()
+
     # Agent mode
-    if args.mode == "agent":
+    elif args.mode == "agent":
         agent = Agent(
             env_name=args.environment,
             render=args.render,
@@ -172,10 +199,8 @@ if __name__ == "__main__":
     elif args.mode == "learner":
         agent = Learner(
             env_name=args.environment,
+            db_server=args.db_server,
             max_steps=args.max_steps,
-            buffer_capacity=args.buffer_capacity,
-            min_replay_size=args.min_replay_size,
-            samples_per_insert=args.samples_per_insert,
             batch_size=args.batch_size,
             actor_learning_rate=args.actor_learning_rate,
             critic_learning_rate=args.critic_learning_rate,
@@ -185,7 +210,6 @@ if __name__ == "__main__":
             init_alpha=args.init_alpha,
             save_path=args.save_path,
             model_path=args.model_path,
-            db_path=args.db_path,
             log_interval=100,
         )
 
