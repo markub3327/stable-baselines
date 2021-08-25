@@ -208,12 +208,12 @@ class Agent(Policy):
         self._total_episodes = 0
         self._total_steps = 0
         self._last_obs = self._env.reset()
-        self._last_action = self.random_policy(self._last_obs)
+        self._last_action = self.collect_policy(self._last_obs)
 
         # spojenie s db
         with self.client.trajectory_writer(num_keep_alive_refs=2) as writer:
             # zahrievacie kola
-            self.collect(writer, self._warmup_steps, self.random_policy)
+            #self.collect(writer, self._warmup_steps, self.random_policy)
 
             # hlavny cyklus hry
             while not self._stop_agents:
