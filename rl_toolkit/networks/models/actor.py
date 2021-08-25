@@ -70,10 +70,8 @@ class Actor(Model):
         if deterministic:
             a = self.bijector.forward(mean)
             return [a, None]
-        elif action != None:
-            variance = tf.matmul(
-                tf.square(latent_sde), tf.square(self.noise.get_std())
-            )
+        elif action is not None:
+            variance = tf.matmul(tf.square(latent_sde), tf.square(self.noise.get_std()))
             pi_distribution = tfp.distributions.TransformedDistribution(
                 distribution=tfp.distributions.MultivariateNormalDiag(
                     loc=mean, scale_diag=tf.sqrt(variance + 1e-6)

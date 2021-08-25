@@ -1,5 +1,9 @@
+import numpy as np
 import reverb
 import tensorflow as tf
+
+from rl_toolkit.networks.models import Actor
+from rl_toolkit.utils import VariableContainer
 
 from .policy import Policy
 
@@ -29,6 +33,40 @@ class Server(Policy):
         db_path: str,
     ):
         super(Server, self).__init__(env_name)
+
+        # Init actor's network
+        self.actor = Actor(n_outputs=np.prod(self._env.action_space.shape))
+        self.actor.build((None,) + self._env.observation_space.shape)
+
+        # Show models details
+        self.actor.summary()
+
+        # Variables
+        self._train_step = tf.Variable(
+            0,
+            trainable=False,
+            dtype=tf.uint64,
+            aggregation=tf.VariableAggregation.ONLY_FIRST_REPLICA,
+            shape=(),
+        )
+        self._stop_agents = tf.Variable(
+            False,
+            trainable=False,
+            dtype=tf.bool,
+            aggregation=tf.VariableAggregation.ONLY_FIRST_REPLICA,
+            shape=(),
+        )
+
+        # Table for storing variables
+        self._variable_container = VariableContainer(
+            db_server="localhost:8000",
+            table="variables",
+            variables={
+                "train_step": self._train_step,
+                "stop_agents": self._stop_agents,
+                "policy_variables": self.actor.variables,
+            },
+        )
 
         # Load DB from checkpoint or make a new one
         if db_path is None:
@@ -92,6 +130,9 @@ class Server(Policy):
             port=8000,
             checkpointer=checkpointer,
         )
+
+        # Init variable container in DB
+        self._variable_container.push_variables()
 
     def run(self):
         self.server.wait()

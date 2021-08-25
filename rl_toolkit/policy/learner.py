@@ -107,8 +107,8 @@ class Learner(Policy):
             },
         )
 
-        # Init variable container in DB
-        self._variable_container.push_variables()
+        # Init variable container from DB server
+        self._variable_container.update_variables()
 
         # Initializes the reverb's dataset
         self.dataset_iterator = iter(

@@ -63,7 +63,9 @@ class ActorCritic(Model):
         alpha = tf.exp(self.log_alpha)
 
         # -------------------- Update 'Critic' -------------------- #
-        _, next_log_pi = self.actor(inputs=data["next_observation"], action=data["next_action"])
+        _, next_log_pi = self.actor(
+            inputs=data["next_observation"], action=data["next_action"]
+        )
         next_quantiles = self.critic([data["next_observation"], data["next_action"]])
         next_quantiles = tf.sort(
             tf.reshape(next_quantiles, [next_quantiles.shape[0], -1])
