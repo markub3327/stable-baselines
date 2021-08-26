@@ -77,7 +77,9 @@ class Learner(Policy):
             actor_optimizer=Adam(learning_rate=actor_learning_rate, clipnorm=1.0),
             critic_optimizer=Adam(learning_rate=critic_learning_rate, clipnorm=1.0),
             alpha_optimizer=Adam(learning_rate=alpha_learning_rate, clipnorm=1.0),
-            curiosity_optimizer=Adam(learning_rate=curiosity_learning_rate, clipnorm=1.0),
+            curiosity_optimizer=Adam(
+                learning_rate=curiosity_learning_rate, clipnorm=1.0
+            ),
         )
 
         if model_path is not None:

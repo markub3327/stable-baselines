@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import Model
 
-from rl_toolkit.networks.models import Actor, MultiCritic, Curiosity
+from rl_toolkit.networks.models import Actor, Curiosity, MultiCritic
 
 
 class ActorCritic(Model):
@@ -64,7 +64,6 @@ class ActorCritic(Model):
             top_quantiles_to_drop=top_quantiles_to_drop,
             n_critics=n_critics,
         )
-        self._update_target(self.critic, self.critic_target, tau=tf.constant(1.0))
 
         # Curiosity
         self.curiosity = Curiosity(64)
@@ -99,7 +98,10 @@ class ActorCritic(Model):
         ]
 
         features_target, features_predicted = self.curiosity(data["next_observation"])
-        returns_int = tf.reduce_sum(tf.keras.losses.huber(y_true=features_target, y_pred=features_predicted), axis=1)
+        returns_int = tf.reduce_sum(
+            tf.keras.losses.huber(y_true=features_target, y_pred=features_predicted),
+            axis=1, keepdims=True
+        )
         tf.print(f"returns_int: {returns_int}")
 
         # Bellman Equation
@@ -173,9 +175,13 @@ class ActorCritic(Model):
 
         # -------------------- Update 'Curiosity' -------------------- #
         with tf.GradientTape() as tape:
-            features_target, features_predicted = self.curiosity(data["next_observation"])
+            features_target, features_predicted = self.curiosity(
+                data["next_observation"]
+            )
 
-            curiosity_loss = tf.nn.compute_average_loss(tf.keras.losses.huber(y_true=features_target, y_pred=features_predicted))
+            curiosity_loss = tf.nn.compute_average_loss(
+                tf.keras.losses.huber(y_true=features_target, y_pred=features_predicted)
+            )
 
         gradients = tape.gradient(curiosity_loss, self.curiosity.trainable_variables)
         self.curiosity_optimizer.apply_gradients(
@@ -196,7 +202,9 @@ class ActorCritic(Model):
         quantiles = self.critic([inputs, action])
         return [quantiles, log_pi]
 
-    def compile(self, actor_optimizer, critic_optimizer, alpha_optimizer, curiosity_optimizer):
+    def compile(
+        self, actor_optimizer, critic_optimizer, alpha_optimizer, curiosity_optimizer
+    ):
         super(ActorCritic, self).compile()
         self.actor_optimizer = actor_optimizer
         self.critic_optimizer = critic_optimizer
@@ -207,3 +215,11 @@ class ActorCritic(Model):
         self.actor.summary()
         self.critic.summary()
         self.curiosity.summary()
+
+    def build(self, input_shape):
+        self.actor.build(input_shape)
+        self.critic.build(input_shape)
+        self.critic_target.build(input_shape)
+        self.curiosity.build(input_shape)
+
+        self._update_target(self.critic, self.critic_target, tau=tf.constant(1.0))

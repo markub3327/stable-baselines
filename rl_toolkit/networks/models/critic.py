@@ -63,6 +63,7 @@ class Critic(Model):
         extrinsic_quantiles = self.extrinsic_quantiles(x)
         return [intrinsic_quantiles, extrinsic_quantiles]
 
+
 class MultiCritic(Model):
     """
     MultiCritic
