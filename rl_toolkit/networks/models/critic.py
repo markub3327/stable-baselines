@@ -61,7 +61,7 @@ class Critic(Model):
         # Output layers
         intrinsic_quantiles = self.intrinsic_quantiles(x)
         extrinsic_quantiles = self.extrinsic_quantiles(x)
-        return [intrinsic_quantiles, extrinsic_quantiles]
+        return [extrinsic_quantiles, intrinsic_quantiles]
 
 
 class MultiCritic(Model):
@@ -90,7 +90,7 @@ class MultiCritic(Model):
             self.models.append(Critic(n_quantiles))
 
     def call(self, inputs):
-        quantiles = tf.stack(list(model(inputs) for model in self.models), axis=1)
+        quantiles = tf.stack(list(model(inputs) for model in self.models), axis=2)
         return quantiles
 
     def summary(self):

@@ -5,7 +5,7 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
 import wandb
-from rl_toolkit.networks import ActorCritic
+from rl_toolkit.networks.models import ActorCritic
 from rl_toolkit.utils import VariableContainer, make_reverb_dataset
 
 from .policy import Policy
@@ -68,7 +68,8 @@ class Learner(Policy):
             top_quantiles_to_drop=3,
             n_critics=3,
             n_outputs=np.prod(self._env.action_space.shape),
-            gamma=gamma,
+            gamma_ext=0.999,
+            gamma_int=0.99,
             tau=tau,
             init_alpha=init_alpha,
         )

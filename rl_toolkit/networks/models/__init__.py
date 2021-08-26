@@ -1,3 +1,4 @@
 from .actor import Actor  # noqa
 from .critic import MultiCritic  # noqa
 from .curiosity import Curiosity  # noqa
+from .actor_critic import ActorCritic  # noqa

@@ -29,14 +29,16 @@ class ActorCritic(Model):
         top_quantiles_to_drop: int,
         n_critics: int,
         n_outputs: int,
-        gamma: float,
+        gamma_ext: float,
+        gamma_int: float,
         tau: float,
         init_alpha: float,
         **kwargs,
     ):
         super(ActorCritic, self).__init__(**kwargs)
 
-        self.gamma = tf.constant(gamma)
+        self.gamma_ext = tf.constant(gamma_ext)
+        self.gamma_int = tf.constant(gamma_int)
         self.tau = tf.constant(tau)
         self.cum_prob = tf.constant(
             (tf.range(n_quantiles, dtype=tf.float32) + 0.5) / n_quantiles
@@ -74,6 +76,51 @@ class ActorCritic(Model):
         ):
             target_weight.assign(tau * source_weight + (1.0 - tau) * target_weight)
 
+    def _get_target_quantiles(self, next_quantiles, reward, gamma, terminal, alpha, next_log_pi):
+        next_quantiles = tf.sort(
+            tf.reshape(next_quantiles[0], [next_quantiles.shape[1], -1])
+        )
+        tf.print(f"next_quantiles: {next_quantiles.shape}")
+        tf.print(f"reward: {reward.shape}")
+        next_quantiles = next_quantiles[
+            :,
+            : self.critic_target.quantiles_total
+            - self.critic_target.top_quantiles_to_drop,
+        ]
+
+        # Bellman Equation
+        target_quantiles = tf.stop_gradient(
+            reward
+            + (1.0 - tf.cast(terminal, dtype=tf.float32))
+            * gamma
+            * (next_quantiles - alpha * next_log_pi)
+        )
+
+        return target_quantiles
+
+    def _get_critic_loss(self, target_quantiles, quantiles):
+        pairwise_delta = (
+            target_quantiles[:, tf.newaxis, tf.newaxis, :]
+            - quantiles[:, :, :, tf.newaxis]
+        )  # batch_size, n_critics, n_quantiles, n_target_quantiles
+        abs_pairwise_delta = tf.math.abs(pairwise_delta)
+        huber_loss = tf.where(
+            abs_pairwise_delta > 1.0,
+            abs_pairwise_delta - 0.5,
+            pairwise_delta ** 2 * 0.5,
+        )
+        critic_loss = tf.nn.compute_average_loss(
+            tf.reduce_mean(
+                tf.math.abs(
+                    self.cum_prob - tf.cast(pairwise_delta < 0.0, dtype=tf.float32)
+                )
+                * huber_loss,
+                axis=[1, 2, 3],
+            )
+        )
+
+        return critic_loss
+
     def train_step(self, data):
         # Re-new noise matrix every update of 'log_std' params
         self.actor.reset_noise()
@@ -88,54 +135,21 @@ class ActorCritic(Model):
             deterministic=False,
         )
         next_quantiles = self.critic_target([data["next_observation"], next_action])
-        next_quantiles = tf.sort(
-            tf.reshape(next_quantiles, [next_quantiles.shape[0], -1])
-        )
-        next_quantiles = next_quantiles[
-            :,
-            : self.critic_target.quantiles_total
-            - self.critic_target.top_quantiles_to_drop,
-        ]
+        tf.print(f"{next_quantiles.shape}")
 
+        # -------------------- Extrinsic rewards -------------------- #
+        target_quantiles_ext = self._get_target_quantiles(next_quantiles=next_quantiles[0], reward=data["reward"], gamma=self.gamma_ext, terminal=data["terminal"], alpha=alpha, next_log_pi=next_log_pi)
+
+        # -------------------- Intrinsic rewards -------------------- #
         features_target, features_predicted = self.curiosity(data["next_observation"])
-        returns_int = tf.reduce_sum(
-            tf.keras.losses.huber(y_true=features_target, y_pred=features_predicted),
-            axis=1, keepdims=True
-        )
-        tf.print(f"returns_int: {returns_int}")
-
-        # Bellman Equation
-        target_quantiles = tf.stop_gradient(
-            data["reward"]
-            + (1.0 - tf.cast(data["terminal"], dtype=tf.float32))
-            * self.gamma
-            * (next_quantiles - alpha * next_log_pi)
-        )
+        target_quantiles_int = self._get_target_quantiles(next_quantiles=next_quantiles[1], reward=tf.reduce_sum((features_target - features_predicted)**2, axis=1)/2.0, gamma=self.gamma_int, terminal=data["terminal"], alpha=alpha, next_log_pi=next_log_pi)
 
         with tf.GradientTape() as tape:
             quantiles = self.critic([data["observation"], data["action"]])
-            tf.print(f"q: {quantiles}")
+            tf.print(f"q: {quantiles.shape}")
 
             # Compute critic loss
-            pairwise_delta = (
-                target_quantiles[:, tf.newaxis, tf.newaxis, :]
-                - quantiles[:, :, :, tf.newaxis]
-            )  # batch_size, n_critics, n_quantiles, n_target_quantiles
-            abs_pairwise_delta = tf.math.abs(pairwise_delta)
-            huber_loss = tf.where(
-                abs_pairwise_delta > 1.0,
-                abs_pairwise_delta - 0.5,
-                pairwise_delta ** 2 * 0.5,
-            )
-            critic_loss = tf.nn.compute_average_loss(
-                tf.reduce_mean(
-                    tf.math.abs(
-                        self.cum_prob - tf.cast(pairwise_delta < 0.0, dtype=tf.float32)
-                    )
-                    * huber_loss,
-                    axis=[1, 2, 3],
-                )
-            )
+            critic_loss = self._get_critic_loss(target_quantiles_ext, quantiles[0]) + self._get_critic_loss(target_quantiles_int, quantiles[1])
 
         gradients = tape.gradient(critic_loss, self.critic.trainable_variables)
         self.critic_optimizer.apply_gradients(
@@ -145,12 +159,16 @@ class ActorCritic(Model):
         # -------------------- Update 'Actor' & 'Alpha' -------------------- #
         with tf.GradientTape(persistent=True) as tape:
             quantiles, log_pi = self(data["observation"])
+            tf.print(f"q: {quantiles.shape}")
 
             # Compute actor loss
             actor_loss = tf.nn.compute_average_loss(
                 alpha * log_pi
                 - tf.reduce_mean(
-                    tf.reduce_mean(quantiles, axis=2), axis=1, keepdims=True
+                    tf.reduce_mean(quantiles[0], axis=2), axis=1, keepdims=True
+                )
+                - tf.reduce_mean(
+                    tf.reduce_mean(quantiles[1], axis=2), axis=1, keepdims=True
                 )
             )
 
