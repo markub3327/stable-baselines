@@ -153,7 +153,7 @@ class ActorCritic(Model):
         features_target, features_predicted = self.curiosity(data["next_observation"])
         target_quantiles_int = self._get_target_quantiles(
             next_quantiles=next_quantiles[1],
-            reward=tf.keras.losses.huber(y_true=features_target, y_pred=features_predicted),
+            reward=tf.expand_dims(tf.keras.losses.huber(y_true=features_target, y_pred=features_predicted), axis=1),
             gamma=self.gamma_int,
             terminal=data["terminal"],
             alpha=alpha,
