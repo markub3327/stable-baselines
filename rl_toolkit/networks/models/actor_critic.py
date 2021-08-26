@@ -85,9 +85,6 @@ class ActorCritic(Model):
         next_quantiles = tf.sort(
             tf.reshape(next_quantiles, [next_quantiles.shape[0], -1])
         )
-        tf.print(f"next_quantiles: {next_quantiles.shape}")
-        tf.print(f"reward: {reward.shape}")
-        tf.print(f"reward: {reward}")
         next_quantiles = next_quantiles[
             :,
             : self.critic_target.quantiles_total
@@ -141,7 +138,6 @@ class ActorCritic(Model):
             deterministic=False,
         )
         next_quantiles = self.critic_target([data["next_observation"], next_action])
-        tf.print(f"{next_quantiles.shape}")
 
         # -------------------- Extrinsic rewards -------------------- #
         target_quantiles_ext = self._get_target_quantiles(
@@ -166,7 +162,6 @@ class ActorCritic(Model):
 
         with tf.GradientTape() as tape:
             quantiles = self.critic([data["observation"], data["action"]])
-            tf.print(f"q: {quantiles.shape}")
 
             # Compute critic loss
             critic_loss = self._get_critic_loss(
@@ -181,7 +176,6 @@ class ActorCritic(Model):
         # -------------------- Update 'Actor' & 'Alpha' -------------------- #
         with tf.GradientTape(persistent=True) as tape:
             quantiles, log_pi = self(data["observation"])
-            tf.print(f"q: {quantiles.shape}")
 
             # Compute actor loss
             actor_loss = tf.nn.compute_average_loss(
