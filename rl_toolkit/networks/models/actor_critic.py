@@ -189,13 +189,14 @@ class ActorCritic(Model):
             quantiles, log_pi = self(data["observation"])
 
             # Compute actor loss
-            x = tf.reduce_mean(
-                    tf.reduce_mean(quantiles[0], axis=[2, 3]), axis=0, keepdims=True
-            )
-            tf.print(f"q: {x.shape}")
             actor_loss = tf.nn.compute_average_loss(
                 alpha * log_pi
-                - x
+                - tf.reduce_mean(
+                    tf.reduce_mean(quantiles[0], axis=2), axis=1, keepdims=True
+                )
+                - tf.reduce_mean(
+                    tf.reduce_mean(quantiles[1], axis=2), axis=1, keepdims=True
+                )
             )
 
             # Compute alpha loss
