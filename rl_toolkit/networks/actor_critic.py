@@ -217,9 +217,8 @@ class ActorCritic(Model):
         self.curiosity.summary()
 
     def build(self, input_shape):
-        self.actor.build(input_shape)
-        self.critic.build(input_shape)
-        self.critic_target.build(input_shape)
+        super(ActorCritic, self).build(input_shape)
+
         self.curiosity.build(input_shape)
 
         self._update_target(self.critic, self.critic_target, tau=tf.constant(1.0))
