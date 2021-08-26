@@ -16,7 +16,8 @@ class ActorCritic(Model):
         top_quantiles_to_drop (int): number of quantiles to drop
         n_critics (int): number of critic networks
         n_outputs (int): number of outputs
-        gamma (float): the discount factor
+        gamma_ext (float): the discount factor for extrinsic rewards
+        gamma_int (float): the discount factor for intrinsic rewards
         tau (float): the soft update coefficient for target networks
         init_alpha (float): initialization of log_alpha param
 
@@ -156,8 +157,7 @@ class ActorCritic(Model):
         features_target, features_predicted = self.curiosity(data["next_observation"])
         target_quantiles_int = self._get_target_quantiles(
             next_quantiles=next_quantiles[1],
-            reward=tf.reduce_sum((features_target - features_predicted) ** 2, axis=1)
-            / 2.0,
+            reward=tf.keras.losses.huber(y_true=features_target, y_pred=features_predicted),
             gamma=self.gamma_int,
             terminal=data["terminal"],
             alpha=alpha,
