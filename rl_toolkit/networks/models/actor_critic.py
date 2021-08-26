@@ -76,12 +76,15 @@ class ActorCritic(Model):
         ):
             target_weight.assign(tau * source_weight + (1.0 - tau) * target_weight)
 
-    def _get_target_quantiles(self, next_quantiles, reward, gamma, terminal, alpha, next_log_pi):
+    def _get_target_quantiles(
+        self, next_quantiles, reward, gamma, terminal, alpha, next_log_pi
+    ):
         next_quantiles = tf.sort(
-            tf.reshape(next_quantiles[0], [next_quantiles.shape[1], -1])
+            tf.reshape(next_quantiles, [next_quantiles.shape[0], -1])
         )
         tf.print(f"next_quantiles: {next_quantiles.shape}")
         tf.print(f"reward: {reward.shape}")
+        tf.print(f"reward: {reward}")
         next_quantiles = next_quantiles[
             :,
             : self.critic_target.quantiles_total
@@ -138,18 +141,35 @@ class ActorCritic(Model):
         tf.print(f"{next_quantiles.shape}")
 
         # -------------------- Extrinsic rewards -------------------- #
-        target_quantiles_ext = self._get_target_quantiles(next_quantiles=next_quantiles[0], reward=data["reward"], gamma=self.gamma_ext, terminal=data["terminal"], alpha=alpha, next_log_pi=next_log_pi)
+        target_quantiles_ext = self._get_target_quantiles(
+            next_quantiles=next_quantiles[0],
+            reward=data["reward"],
+            gamma=self.gamma_ext,
+            terminal=data["terminal"],
+            alpha=alpha,
+            next_log_pi=next_log_pi,
+        )
 
         # -------------------- Intrinsic rewards -------------------- #
         features_target, features_predicted = self.curiosity(data["next_observation"])
-        target_quantiles_int = self._get_target_quantiles(next_quantiles=next_quantiles[1], reward=tf.reduce_sum((features_target - features_predicted)**2, axis=1)/2.0, gamma=self.gamma_int, terminal=data["terminal"], alpha=alpha, next_log_pi=next_log_pi)
+        target_quantiles_int = self._get_target_quantiles(
+            next_quantiles=next_quantiles[1],
+            reward=tf.reduce_sum((features_target - features_predicted) ** 2, axis=1)
+            / 2.0,
+            gamma=self.gamma_int,
+            terminal=data["terminal"],
+            alpha=alpha,
+            next_log_pi=next_log_pi,
+        )
 
         with tf.GradientTape() as tape:
             quantiles = self.critic([data["observation"], data["action"]])
             tf.print(f"q: {quantiles.shape}")
 
             # Compute critic loss
-            critic_loss = self._get_critic_loss(target_quantiles_ext, quantiles[0]) + self._get_critic_loss(target_quantiles_int, quantiles[1])
+            critic_loss = self._get_critic_loss(
+                target_quantiles_ext, quantiles[0]
+            ) + self._get_critic_loss(target_quantiles_int, quantiles[1])
 
         gradients = tape.gradient(critic_loss, self.critic.trainable_variables)
         self.critic_optimizer.apply_gradients(
