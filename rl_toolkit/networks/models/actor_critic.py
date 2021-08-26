@@ -210,7 +210,7 @@ class ActorCritic(Model):
         # -------------------- Update 'Curiosity' -------------------- #
         with tf.GradientTape() as tape:
             features_target, features_predicted = self.curiosity(
-                data["next_observation"]
+                data["observation"]
             )
 
             curiosity_loss = tf.nn.compute_average_loss(
