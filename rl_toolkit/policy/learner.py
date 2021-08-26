@@ -119,7 +119,7 @@ class Learner(Policy):
                 server_address=f"{db_server}:8000",
                 table="experience",
                 batch_size=batch_size,
-                num_parallel_calls=os.cpu_count()
+                num_parallel_calls=os.cpu_count(),
             )
         )
 
