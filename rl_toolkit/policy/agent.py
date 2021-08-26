@@ -92,13 +92,13 @@ class Agent(Policy):
         return action
 
     @tf.function
-    def collect_policy(self, input):
-        action, _ = self.actor(
+    def collect_policy(self, input, with_log_prob):
+        action, log_pi = self.actor(
             tf.expand_dims(input, axis=0),
-            with_log_prob=False,
+            with_log_prob=with_log_prob,
             deterministic=False,
         )
-        return tf.squeeze(action, axis=0)
+        return [tf.squeeze(action, axis=0), tf.squeeze(log_pi, axis=0)]
 
     def collect(self, writer, max_steps, policy):
         # collect the rollout
@@ -107,7 +107,7 @@ class Agent(Policy):
             new_obs, reward, terminal, _ = self._env.step(self._last_action)
 
             # Get the next action
-            new_action = policy(new_obs)
+            new_action, new_log_pi = policy(new_obs, with_log_prob=True)
             new_action = np.array(new_action, copy=False, dtype="float32")
 
             # Update variables
@@ -122,6 +122,7 @@ class Agent(Policy):
                     "action": self._last_action,
                     "reward": np.array([reward], copy=False, dtype="float32"),
                     "terminal": np.array([terminal], copy=False, dtype="bool"),
+                    "next_log_pi": new_log_pi,
                 }
             )
 
@@ -137,6 +138,7 @@ class Agent(Policy):
                         "next_observation": writer.history["observation"][-1],
                         "next_action": writer.history["action"][-1],
                         "terminal": writer.history["terminal"][-2],
+                        "next_log_pi": writer.history["next_log_pi"][-2],
                     },
                 )
 
@@ -159,6 +161,7 @@ class Agent(Policy):
                         "next_observation": writer.history["observation"][-1],
                         "next_action": writer.history["action"][-1],
                         "terminal": writer.history["terminal"][-2],
+                        "next_log_pi": writer.history["next_log_pi"][-2],
                     },
                 )
 
@@ -191,7 +194,7 @@ class Agent(Policy):
                 self._last_obs = self._env.reset()
 
                 # Get the action
-                self._last_action = policy(self._last_obs)
+                self._last_action, _ = policy(self._last_obs, with_log_prob=False)
                 self._last_action = np.array(
                     self._last_action, copy=False, dtype="float32"
                 )
@@ -208,12 +211,15 @@ class Agent(Policy):
         self._total_episodes = 0
         self._total_steps = 0
         self._last_obs = self._env.reset()
-        self._last_action = self.random_policy(self._last_obs)
+        self._last_action, _ = self.collect_policy(self._last_obs, with_log_prob=False)
+        self._last_action = np.array(
+            self._last_action, copy=False, dtype="float32"
+        )
 
         # spojenie s db
         with self.client.trajectory_writer(num_keep_alive_refs=2) as writer:
             # zahrievacie kola
-            self.collect(writer, self._warmup_steps, self.random_policy)
+            #self.collect(writer, self._warmup_steps, self.random_policy)
 
             # hlavny cyklus hry
             while not self._stop_agents:

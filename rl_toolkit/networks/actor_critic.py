@@ -97,7 +97,7 @@ class ActorCritic(Model):
             data["reward"]
             + (1.0 - tf.cast(data["terminal"], dtype=tf.float32))
             * self.gamma
-            * next_quantiles
+            * (next_quantiles - alpha * data["next_log_pi"])
         )
 
         with tf.GradientTape() as tape:

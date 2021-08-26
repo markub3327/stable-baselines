@@ -115,6 +115,7 @@ class Server(Policy):
                             self._env.action_space.dtype,
                         ),
                         "terminal": tf.TensorSpec([1], tf.bool),
+                        "next_log_pi": tf.TensorSpec([1], tf.float32),
                     },
                 ),
                 reverb.Table(  # Variables container
