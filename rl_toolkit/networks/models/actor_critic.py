@@ -42,6 +42,8 @@ class ActorCritic(Model):
 
         self.gamma_ext = tf.constant(gamma_ext)
         self.gamma_int = tf.constant(gamma_int)
+        self._ext_coef = tf.constant(2.0)
+        self._int_coef = tf.constant(1.0)
         self.tau = tf.constant(tau)
         self.cum_prob = tf.constant(
             (tf.range(n_quantiles, dtype=tf.float32) + 0.5) / n_quantiles
@@ -127,9 +129,9 @@ class ActorCritic(Model):
     def _get_curiosity(self, state):
         features_target, features_predicted = self.curiosity(state)
 
-        curiosity = (features_target - features_predicted)**2
-        curiosity = tf.reduce_sum(curiosity, axis=1, keepdims=True)/2.0
-        
+        curiosity = (features_target - features_predicted) ** 2
+        curiosity = tf.reduce_sum(curiosity, axis=1, keepdims=True) / 2.0
+
         return curiosity
 
     def train_step(self, data):
@@ -189,10 +191,12 @@ class ActorCritic(Model):
             # Compute actor loss
             actor_loss = tf.nn.compute_average_loss(
                 alpha * log_pi
-                - tf.reduce_mean(
+                - self._ext_coef
+                * tf.reduce_mean(
                     tf.reduce_mean(quantiles[0], axis=2), axis=1, keepdims=True
                 )
-                - tf.reduce_mean(
+                - self._int_coef
+                * tf.reduce_mean(
                     tf.reduce_mean(quantiles[1], axis=2), axis=1, keepdims=True
                 )
             )
@@ -218,9 +222,7 @@ class ActorCritic(Model):
 
         # -------------------- Update 'Curiosity' -------------------- #
         with tf.GradientTape() as tape:
-            features_target, features_predicted = self.curiosity(
-                data["observation"]
-            )
+            features_target, features_predicted = self.curiosity(data["observation"])
 
             curiosity_loss = tf.nn.compute_average_loss(
                 tf.keras.losses.huber(y_true=features_target, y_pred=features_predicted)
