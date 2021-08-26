@@ -124,6 +124,14 @@ class ActorCritic(Model):
 
         return critic_loss
 
+    def _get_curiosity(self, state):
+        features_target, features_predicted = self.curiosity(state)
+
+        curiosity = (features_target - features_predicted)**2
+        curiosity = tf.reduce_sum(curiosity, axis=1, keepdims=True)/2.0
+        
+        return curiosity
+
     def train_step(self, data):
         # Re-new noise matrix every update of 'log_std' params
         self.actor.reset_noise()
@@ -150,10 +158,13 @@ class ActorCritic(Model):
         )
 
         # -------------------- Intrinsic rewards -------------------- #
-        features_target, features_predicted = self.curiosity(data["next_observation"])
+        curiosity = self._get_curiosity(data["next_observation"])
+        curiosity = tf.clip_by_value(curiosity, -1.0, 1.0)
+        tf.print(f"curiosity: {curiosity.shape}")
+        tf.print(f"curiosity: {curiosity}")
         target_quantiles_int = self._get_target_quantiles(
             next_quantiles=next_quantiles[1],
-            reward=tf.expand_dims(tf.keras.losses.huber(y_true=features_target, y_pred=features_predicted), axis=1),
+            reward=curiosity,
             gamma=self.gamma_int,
             terminal=data["terminal"],
             alpha=alpha,
@@ -178,14 +189,13 @@ class ActorCritic(Model):
             quantiles, log_pi = self(data["observation"])
 
             # Compute actor loss
+            x = tf.reduce_mean(
+                    tf.reduce_mean(quantiles[0], axis=[2, 3]), axis=0, keepdims=True
+            )
+            tf.print(f"q: {x.shape}")
             actor_loss = tf.nn.compute_average_loss(
                 alpha * log_pi
-                - tf.reduce_mean(
-                    tf.reduce_mean(quantiles[0], axis=2), axis=1, keepdims=True
-                )
-                - tf.reduce_mean(
-                    tf.reduce_mean(quantiles[1], axis=2), axis=1, keepdims=True
-                )
+                - x
             )
 
             # Compute alpha loss
