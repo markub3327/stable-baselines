@@ -80,9 +80,12 @@ class ActorCritic(Model):
         alpha = tf.exp(self.log_alpha)
 
         # -------------------- Update 'Critic' -------------------- #
-        next_quantiles = self.critic_target(
-            [data["next_observation"], data["next_action"]]
+        next_action, next_log_pi = self.actor(
+            data["next_observation"],
+            with_log_prob=True,
+            deterministic=False,
         )
+        next_quantiles = self.critic_target([data["next_observation"], next_action])
         next_quantiles = tf.sort(
             tf.reshape(next_quantiles, [next_quantiles.shape[0], -1])
         )
@@ -97,7 +100,7 @@ class ActorCritic(Model):
             data["reward"]
             + (1.0 - tf.cast(data["terminal"], dtype=tf.float32))
             * self.gamma
-            * (next_quantiles - alpha * data["next_log_pi"])
+            * (next_quantiles - alpha * next_log_pi)
         )
 
         with tf.GradientTape() as tape:
