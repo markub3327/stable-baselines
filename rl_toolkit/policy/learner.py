@@ -25,6 +25,7 @@ class Learner(Policy):
         critic_learning_rate (float): the learning rate for Critic's optimizer
         alpha_learning_rate (float): the learning rate for Alpha's optimizer
         gamma (float): the discount factor
+        tau (float): the soft update coefficient for target networks
         init_alpha (float): initialization of alpha param
         model_path (str): path to the model
         save_path (str): path to the models for saving
@@ -45,6 +46,7 @@ class Learner(Policy):
         alpha_learning_rate: float,
         # ---
         gamma: float,
+        tau: float,
         init_alpha: float,
         # ---
         model_path: str,
@@ -65,6 +67,7 @@ class Learner(Policy):
             n_critics=3,
             n_outputs=np.prod(self._env.action_space.shape),
             gamma=gamma,
+            tau=tau,
             init_alpha=init_alpha,
         )
         self.model.build((None,) + self._env.observation_space.shape)
@@ -127,6 +130,7 @@ class Learner(Policy):
         wandb.config.critic_learning_rate = critic_learning_rate
         wandb.config.alpha_learning_rate = alpha_learning_rate
         wandb.config.gamma = gamma
+        wandb.config.tau = tau
         wandb.config.init_alpha = init_alpha
 
     @tf.function
