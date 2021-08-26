@@ -1,7 +1,9 @@
 import tensorflow as tf
 from tensorflow.keras import Model
 
-from rl_toolkit.networks.models import Actor, Curiosity, MultiCritic
+from .actor import Actor
+from .critic import MultiCritic
+from .curiosity import Curiosity
 
 
 class ActorCritic(Model):
