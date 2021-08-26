@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import Model
 
-from rl_toolkit.networks.models import Actor, MultiCritic
+from rl_toolkit.networks.models import Actor, MultiCritic, Curiosity
 
 
 class ActorCritic(Model):
@@ -66,6 +66,9 @@ class ActorCritic(Model):
         )
         self._update_target(self.critic, self.critic_target, tau=tf.constant(1.0))
 
+        # Curiosity
+        self.curiosity = Curiosity(64)
+
     def _update_target(self, net, net_targ, tau):
         for source_weight, target_weight in zip(
             net.trainable_variables, net_targ.trainable_variables
@@ -95,6 +98,10 @@ class ActorCritic(Model):
             - self.critic_target.top_quantiles_to_drop,
         ]
 
+        features_target, features_predicted = self.curiosity(data["next_observation"])
+        returns_int = tf.reduce_sum(tf.keras.losses.huber(y_true=features_target, y_pred=features_predicted), axis=1)
+        tf.print(f"returns_int: {returns_int}")
+
         # Bellman Equation
         target_quantiles = tf.stop_gradient(
             data["reward"]
@@ -105,6 +112,7 @@ class ActorCritic(Model):
 
         with tf.GradientTape() as tape:
             quantiles = self.critic([data["observation"], data["action"]])
+            tf.print(f"q: {quantiles}")
 
             # Compute critic loss
             pairwise_delta = (
@@ -163,10 +171,22 @@ class ActorCritic(Model):
         # -------------------- Soft update target networks -------------------- #
         self._update_target(self.critic, self.critic_target, tau=self.tau)
 
+        # -------------------- Update 'Curiosity' -------------------- #
+        with tf.GradientTape() as tape:
+            features_target, features_predicted = self.curiosity(data["next_observation"])
+
+            curiosity_loss = tf.nn.compute_average_loss(tf.keras.losses.huber(y_true=features_target, y_pred=features_predicted))
+
+        gradients = tape.gradient(curiosity_loss, self.curiosity.trainable_variables)
+        self.curiosity_optimizer.apply_gradients(
+            zip(gradients, self.curiosity.trainable_variables)
+        )
+
         return {
             "actor_loss": actor_loss,
             "critic_loss": critic_loss,
             "alpha_loss": alpha_loss,
+            "curiosity_loss": curiosity_loss,
         }
 
     def call(self, inputs, with_log_prob=True, deterministic=None):
@@ -176,12 +196,14 @@ class ActorCritic(Model):
         quantiles = self.critic([inputs, action])
         return [quantiles, log_pi]
 
-    def compile(self, actor_optimizer, critic_optimizer, alpha_optimizer):
+    def compile(self, actor_optimizer, critic_optimizer, alpha_optimizer, curiosity_optimizer):
         super(ActorCritic, self).compile()
         self.actor_optimizer = actor_optimizer
         self.critic_optimizer = critic_optimizer
         self.alpha_optimizer = alpha_optimizer
+        self.curiosity_optimizer = curiosity_optimizer
 
     def summary(self):
         self.actor.summary()
         self.critic.summary()
+        self.curiosity.summary()

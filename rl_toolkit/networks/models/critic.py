@@ -35,8 +35,14 @@ class Critic(Model):
             kernel_initializer="he_uniform",
         )
 
-        # Output layer
-        self.quantiles = Dense(
+        # Output layers
+        self.intrinsic_quantiles = Dense(
+            n_quantiles,
+            activation="linear",
+            kernel_initializer="glorot_uniform",
+            name="quantiles",
+        )
+        self.extrinsic_quantiles = Dense(
             n_quantiles,
             activation="linear",
             kernel_initializer="glorot_uniform",
@@ -52,10 +58,10 @@ class Critic(Model):
         # 2. layer
         x = self.fc2(x)
 
-        # Output layer
-        quantiles = self.quantiles(x)
-        return quantiles
-
+        # Output layers
+        intrinsic_quantiles = self.intrinsic_quantiles(x)
+        extrinsic_quantiles = self.extrinsic_quantiles(x)
+        return [intrinsic_quantiles, extrinsic_quantiles]
 
 class MultiCritic(Model):
     """

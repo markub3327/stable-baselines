@@ -1,0 +1,90 @@
+from tensorflow.keras import Model
+from tensorflow.keras.layers import Dense
+
+
+class Curiosity(Model):
+    """
+    Curiosity
+    ===============
+
+    Attributes:
+        latent_space (int): number of features
+
+    References:
+        - [Exploration by Random Network Distillation](https://arxiv.org/abs/1810.12894)
+    """
+
+    def __init__(self, latent_space: int, **kwargs):
+        super(Curiosity, self).__init__(**kwargs)
+
+        # Target
+        # 1. layer
+        self.target_fc1 = Dense(
+            400,
+            activation="relu",
+            kernel_initializer="he_uniform",
+        )
+        self.target_fc1.trainable = False
+
+        # 2. layer
+        self.target_fc2 = Dense(
+            300,
+            activation="relu",
+            kernel_initializer="he_uniform",
+        )
+        self.target_fc2.trainable = False
+
+        # Output layer
+        self.target = Dense(
+            latent_space,
+            activation="linear",
+            kernel_initializer="glorot_uniform",
+            name="target",
+        )
+        self.target.trainable = False
+
+        # Predicted
+        # 1. layer
+        self.predicted_fc1 = Dense(
+            400,
+            activation="relu",
+            kernel_initializer="he_uniform",
+        )
+
+        # 2. layer
+        self.predicted_fc2 = Dense(
+            300,
+            activation="relu",
+            kernel_initializer="he_uniform",
+        )
+
+        # Output layer
+        self.predicted = Dense(
+            latent_space,
+            activation="linear",
+            kernel_initializer="glorot_uniform",
+            name="predicted",
+        )
+
+    def call(self, inputs):
+        # Target
+        # 1. layer
+        target = self.target_fc1(inputs)
+
+        # 2. layer
+        target = self.target_fc2(target)
+
+        # Output layer
+        target = self.target(target)
+
+        # Predicted
+        # 1. layer
+        predicted = self.predicted_fc1(inputs)
+
+        # 2. layer
+        predicted = self.predicted_fc2(predicted)
+
+        # Output layer
+        predicted = self.predicted(predicted)
+
+        return [target, predicted]

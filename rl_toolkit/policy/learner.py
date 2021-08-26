@@ -24,6 +24,7 @@ class Learner(Policy):
         actor_learning_rate (float): the learning rate for Actor's optimizer
         critic_learning_rate (float): the learning rate for Critic's optimizer
         alpha_learning_rate (float): the learning rate for Alpha's optimizer
+        curiosity_learning_rate (float): the learning rate for Curiosity's optimizer
         gamma (float): the discount factor
         tau (float): the soft update coefficient for target networks
         init_alpha (float): initialization of alpha param
@@ -44,6 +45,7 @@ class Learner(Policy):
         actor_learning_rate: float,
         critic_learning_rate: float,
         alpha_learning_rate: float,
+        curiosity_learning_rate: float,
         # ---
         gamma: float,
         tau: float,
@@ -75,6 +77,7 @@ class Learner(Policy):
             actor_optimizer=Adam(learning_rate=actor_learning_rate, clipnorm=1.0),
             critic_optimizer=Adam(learning_rate=critic_learning_rate, clipnorm=1.0),
             alpha_optimizer=Adam(learning_rate=alpha_learning_rate, clipnorm=1.0),
+            curiosity_optimizer=Adam(learning_rate=curiosity_learning_rate, clipnorm=1.0),
         )
 
         if model_path is not None:
@@ -162,6 +165,7 @@ class Learner(Policy):
                 print(f"Alpha loss: {losses['alpha_loss']}")
                 print(f"Critic loss: {losses['critic_loss']}")
                 print(f"Actor loss: {losses['actor_loss']}")
+                print(f"Curiosity loss: {losses['curiosity_loss']}")
                 print("=============================================")
                 print(
                     f"Training ... {(self._train_step.numpy() * 100) / self._max_steps} %"  # noqa
@@ -172,6 +176,7 @@ class Learner(Policy):
                     "Alpha loss": losses["alpha_loss"],
                     "Critic loss": losses["critic_loss"],
                     "Actor loss": losses["actor_loss"],
+                    "Curiosity loss": losses["curiosity_loss"],
                 },
                 step=self._train_step.numpy(),
             )
