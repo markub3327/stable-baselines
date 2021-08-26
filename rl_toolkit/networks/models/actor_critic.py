@@ -160,8 +160,6 @@ class ActorCritic(Model):
         # -------------------- Intrinsic rewards -------------------- #
         curiosity = self._get_curiosity(data["next_observation"])
         curiosity = tf.clip_by_value(curiosity, -1.0, 1.0)
-        tf.print(f"curiosity: {curiosity.shape}")
-        tf.print(f"curiosity: {curiosity}")
         target_quantiles_int = self._get_target_quantiles(
             next_quantiles=next_quantiles[1],
             reward=curiosity,
