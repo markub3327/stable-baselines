@@ -36,14 +36,16 @@ class ActorCritic(Model):
         gamma_int: float,
         tau: float,
         init_alpha: float,
+        running_stats_obs,
         **kwargs,
     ):
         super(ActorCritic, self).__init__(**kwargs)
 
+        self.running_stats_obs = running_stats_obs
         self.gamma_ext = tf.constant(gamma_ext)
         self.gamma_int = tf.constant(gamma_int)
-        self._ext_coef = tf.constant(2.0)
-        self._int_coef = tf.constant(1.0)
+        self.ext_coef = tf.constant(2.0)
+        self.int_coef = tf.constant(1.0)
         self.tau = tf.constant(tau)
         self.cum_prob = tf.constant(
             (tf.range(n_quantiles, dtype=tf.float32) + 0.5) / n_quantiles
@@ -141,6 +143,10 @@ class ActorCritic(Model):
         # Get 'Alpha'
         alpha = tf.exp(self.log_alpha)
 
+        # update
+        self.running_stats_obs.update(data["next_observation"])
+        next_obs_norm = self.running_stats_obs.normalize(data["next_observation"])
+
         # -------------------- Update 'Critic' -------------------- #
         next_action, next_log_pi = self.actor(
             data["next_observation"],
@@ -159,8 +165,8 @@ class ActorCritic(Model):
             next_log_pi=next_log_pi,
         )
 
-        # -------------------- Intrinsic rewards -------------------- #
-        curiosity = self._get_curiosity(data["next_observation"])
+        # --------------------- Intrinsic rewards -------------------- #
+        curiosity = self._get_curiosity(next_obs_norm)
         curiosity = tf.clip_by_value(curiosity, -1.0, 1.0)
         target_quantiles_int = self._get_target_quantiles(
             next_quantiles=next_quantiles[1],
@@ -191,11 +197,11 @@ class ActorCritic(Model):
             # Compute actor loss
             actor_loss = tf.nn.compute_average_loss(
                 alpha * log_pi
-                - self._ext_coef
+                - self.ext_coef
                 * tf.reduce_mean(
                     tf.reduce_mean(quantiles[0], axis=2), axis=1, keepdims=True
                 )
-                - self._int_coef
+                - self.int_coef
                 * tf.reduce_mean(
                     tf.reduce_mean(quantiles[1], axis=2), axis=1, keepdims=True
                 )
@@ -220,9 +226,9 @@ class ActorCritic(Model):
         # -------------------- Soft update target networks -------------------- #
         self._update_target(self.critic, self.critic_target, tau=self.tau)
 
-        # -------------------- Update 'Curiosity' -------------------- #
+        # ------------------------- Update 'Curiosity' ------------------------ #
         with tf.GradientTape() as tape:
-            features_target, features_predicted = self.curiosity(data["observation"])
+            features_target, features_predicted = self.curiosity(next_obs_norm)
 
             curiosity_loss = tf.nn.compute_average_loss(
                 tf.keras.losses.huber(y_true=features_target, y_pred=features_predicted)

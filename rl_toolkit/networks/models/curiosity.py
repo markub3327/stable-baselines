@@ -8,13 +8,13 @@ class Curiosity(Model):
     ===============
 
     Attributes:
-        latent_space (int): number of features
+        features_space (int): number of features
 
     References:
         - [Exploration by Random Network Distillation](https://arxiv.org/abs/1810.12894)
     """
 
-    def __init__(self, latent_space: int, **kwargs):
+    def __init__(self, features_space: int, **kwargs):
         super(Curiosity, self).__init__(**kwargs)
 
         # Target
@@ -23,25 +23,25 @@ class Curiosity(Model):
             400,
             activation="relu",
             kernel_initializer="he_uniform",
+            trainable=False,
         )
-        self.target_fc1.trainable = False
 
         # 2. layer
         self.target_fc2 = Dense(
             300,
             activation="relu",
             kernel_initializer="he_uniform",
+            trainable=False,
         )
-        self.target_fc2.trainable = False
 
         # Output layer
         self.target = Dense(
-            latent_space,
+            features_space,
             activation="linear",
             kernel_initializer="glorot_uniform",
             name="target",
+            trainable=False,
         )
-        self.target.trainable = False
 
         # Predicted
         # 1. layer
@@ -60,7 +60,7 @@ class Curiosity(Model):
 
         # Output layer
         self.predicted = Dense(
-            latent_space,
+            features_space,
             activation="linear",
             kernel_initializer="glorot_uniform",
             name="predicted",

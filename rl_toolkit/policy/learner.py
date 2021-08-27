@@ -6,7 +6,7 @@ from tensorflow.keras.optimizers import Adam
 
 import wandb
 from rl_toolkit.networks.models import ActorCritic
-from rl_toolkit.utils import VariableContainer, make_reverb_dataset
+from rl_toolkit.utils import VariableContainer, make_reverb_dataset, RunningStats
 
 from .policy import Policy
 
@@ -62,6 +62,9 @@ class Learner(Policy):
         self._save_path = save_path
         self._log_interval = log_interval
 
+        # init running statistics
+        self._running_stats_obs = RunningStats(self._env.observation_space.shape)
+
         # Init actor-critic's network
         self.model = ActorCritic(
             n_quantiles=35,
@@ -72,6 +75,7 @@ class Learner(Policy):
             gamma_int=0.99,
             tau=tau,
             init_alpha=init_alpha,
+            running_stats_obs=self._running_stats_obs
         )
         self.model.build((None,) + self._env.observation_space.shape)
         self.model.compile(
