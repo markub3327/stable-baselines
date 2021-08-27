@@ -8,8 +8,8 @@ class RunningStats:
         self.momentum = 0.999
 
     def update(self, batch):
-        self.mean.assign(self.mean * self.momentum + tf.reduce_mean(batch, axis=0) * (1 - self.momentum))
-        self.variance.assign(self.variance * self.momentum + tf.reduce_variance(batch, axis=0) * (1 - self.momentum))
+        self.mean.assign(self.mean * self.momentum + tf.math.reduce_mean(batch, axis=0) * (1 - self.momentum))
+        self.variance.assign(self.variance * self.momentum + tf.math.reduce_variance(batch, axis=0) * (1 - self.momentum))
         tf.print(f"mean: {self.mean}, variance: {self.variance}")
 
     def normalize(self, values):
